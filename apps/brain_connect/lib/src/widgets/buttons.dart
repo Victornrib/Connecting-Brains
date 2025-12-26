@@ -5,6 +5,8 @@ ElevatedButton customButton({
   required BuildContext context,
   required String text,
   required VoidCallback onPressed,
+  Color? backgroundColor, // optional
+  Color? textColor, // optional
 }) {
   final screenWidth = MediaQuery.of(context).size.width;
   final screenHeight = MediaQuery.of(context).size.height;
@@ -15,7 +17,7 @@ ElevatedButton customButton({
       vertical: screenHeight * 0.01,
       horizontal: screenWidth * 0.05,
     ),
-    backgroundColor: const Color.fromRGBO(38, 71, 51, 1),
+    backgroundColor: backgroundColor ?? const Color.fromRGBO(38, 71, 51, 1),
     shape: const RoundedRectangleBorder(
       side: BorderSide(color: Colors.black, width: 2),
       borderRadius: BorderRadius.all(Radius.circular(15)),
@@ -27,11 +29,11 @@ ElevatedButton customButton({
     style: sharedButtonStyle,
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 22,
         fontFamily: 'Inter',
         fontWeight: FontWeight.bold,
-        color: Color.fromRGBO(16, 164, 55, 1),
+        color: textColor ?? const Color.fromRGBO(16, 164, 55, 1),
       ),
     ),
   );

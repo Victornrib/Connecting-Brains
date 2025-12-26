@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:brain_connect/src/services/bluetooth_service.dart';
 
 class PairDeviceScreen extends StatefulWidget {
   const PairDeviceScreen({super.key});
@@ -10,8 +10,11 @@ class PairDeviceScreen extends StatefulWidget {
 }
 
 class _PairDeviceScreenState extends State<PairDeviceScreen> {
+  final AppBluetoothService _bluetoothService = AppBluetoothService();
   List<ScanResult> scanResults = [];
   bool isScanning = false;
+  bool isConnecting = false;
+  String connectingDeviceId = '';
 
   @override
   void initState() {
@@ -19,38 +22,21 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
     initBluetooth();
   }
 
-  // ---------- PERMISSIONS ----------
-  Future<bool> requestBluetoothPermissions() async {
-    final scan = await Permission.bluetoothScan.request();
-    final connect = await Permission.bluetoothConnect.request();
-    final location = await Permission.locationWhenInUse.request();
-
-    return scan.isGranted && connect.isGranted && location.isGranted;
-  }
-
-  // ---------- INIT ----------
   Future<void> initBluetooth() async {
-    final hasPermission = await requestBluetoothPermissions();
+    final hasPermission = await _bluetoothService.requestPermissions();
     if (!hasPermission) return;
-
-    final adapterState = await FlutterBluePlus.adapterState.first;
-    if (adapterState != BluetoothAdapterState.on) {
-      await FlutterBluePlus.turnOn();
-    }
-
+    await _bluetoothService.ensureAdapterOn();
     startScan();
   }
 
-  // ---------- SCAN ----------
   void startScan() async {
     setState(() {
       scanResults.clear();
       isScanning = true;
     });
 
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
-
-    FlutterBluePlus.scanResults.listen((results) {
+    _bluetoothService.scan().listen((results) {
+      if (!mounted) return;
       setState(() {
         scanResults = results;
         isScanning = false;
@@ -64,7 +50,6 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
     super.dispose();
   }
 
-  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -81,8 +66,6 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
           child: Column(
             children: [
               const Spacer(flex: 1),
-
-              // TITLE + REFRESH
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -101,10 +84,7 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
                   ),
                 ],
               ),
-
               const Spacer(flex: 2),
-
-              // DEVICE LIST AREA
               SizedBox(
                 height: screenHeight * 0.4,
                 child: Center(
@@ -129,21 +109,90 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
                               itemBuilder: (context, index) {
                                 final result = scanResults[index];
                                 final device = result.device;
+                                final isThisConnecting =
+                                    isConnecting &&
+                                    connectingDeviceId == device.id.id;
 
                                 return SizedBox(
                                   width: double.infinity,
                                   height: screenHeight * 0.07,
                                   child: ElevatedButton(
-                                    onPressed: () async {
-                                      try {
-                                        await device.connect();
-                                        debugPrint(
-                                          'Connected to ${device.name}',
-                                        );
-                                      } catch (_) {}
-                                    },
+                                    onPressed:
+                                        isThisConnecting
+                                            ? null
+                                            : () async {
+                                              setState(() {
+                                                isConnecting = true;
+                                                connectingDeviceId =
+                                                    device.id.id;
+                                              });
+
+                                              try {
+                                                await _bluetoothService
+                                                    .connectDevice(device);
+                                                if (!mounted) return;
+
+                                                // Close dialog first, then pop with result safely
+                                                await showDialog(
+                                                  context: context,
+                                                  barrierDismissible: false,
+                                                  builder:
+                                                      (_) => AlertDialog(
+                                                        title: const Text(
+                                                          'Device Connected',
+                                                        ),
+                                                        content: Text(
+                                                          device.name.isNotEmpty
+                                                              ? device.name
+                                                              : 'Unknown device',
+                                                        ),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                context,
+                                                              ).pop(); // close dialog
+                                                            },
+                                                            child: const Text(
+                                                              'OK',
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                );
+
+                                                // Use microtask to ensure navigator transition finished
+                                                Future.microtask(() {
+                                                  if (mounted) {
+                                                    Navigator.pop(
+                                                      context,
+                                                      device,
+                                                    ); // return device
+                                                  }
+                                                });
+                                              } catch (e) {
+                                                if (!mounted) return;
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Failed to connect: $e',
+                                                    ),
+                                                  ),
+                                                );
+                                              } finally {
+                                                setState(() {
+                                                  isConnecting = false;
+                                                  connectingDeviceId = '';
+                                                });
+                                              }
+                                            },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
+                                      backgroundColor:
+                                          isThisConnecting
+                                              ? Colors.grey
+                                              : Colors.green,
                                       shape: RoundedRectangleBorder(
                                         side: const BorderSide(
                                           color: Colors.black,
@@ -152,16 +201,42 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    child: Text(
-                                      device.name.isNotEmpty
-                                          ? device.name
-                                          : 'Unknown device',
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
+                                    child:
+                                        isThisConnecting
+                                            ? const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Colors.black,
+                                                      ),
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'Connecting...',
+                                                  style: TextStyle(
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                            : Text(
+                                              device.name.isNotEmpty
+                                                  ? device.name
+                                                  : 'Unknown device',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black,
+                                              ),
+                                            ),
                                   ),
                                 );
                               },
@@ -169,7 +244,6 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
                   ),
                 ),
               ),
-
               const Spacer(flex: 2),
             ],
           ),

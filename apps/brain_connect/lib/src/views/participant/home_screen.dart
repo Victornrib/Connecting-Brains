@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:brain_connect/src/views/participant/pair_device.dart';
 import 'package:brain_connect/src/widgets/buttons.dart';
+import 'package:brain_connect/src/models/device_state.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class ParticipantHomeScreen extends StatelessWidget {
   const ParticipantHomeScreen({super.key});
@@ -19,7 +22,6 @@ class ParticipantHomeScreen extends StatelessWidget {
             vertical: screenHeight * 0.01,
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               // TOP RIGHT HEADER
               Align(
@@ -29,62 +31,66 @@ class ParticipantHomeScreen extends StatelessWidget {
                     top: screenHeight * 0.01,
                     right: screenWidth * 0.02,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
+                  child: Consumer<DeviceState>(
+                    builder: (context, deviceState, _) {
+                      return Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            'Welcome, User',
-                            style: TextStyle(
-                              fontSize: screenWidth * 0.07,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Welcome, User',
+                                style: TextStyle(
+                                  fontSize: screenWidth * 0.07,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                              GestureDetector(
+                                onTap: () => debugPrint('User settings screen'),
+                                child: Image.asset(
+                                  'assets/images/user.png',
+                                  width: screenWidth * 0.1,
+                                  height: screenWidth * 0.1,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(width: screenWidth * 0.02),
-                          GestureDetector(
-                            onTap: () {
-                              // RODO: Create user settings screen
-                              print('User settings screen');
-                            },
-                            child: Image.asset(
-                              'assets/images/user.png',
-                              width: screenWidth * 0.1,
-                              height: screenWidth * 0.1,
-                            ),
+                          SizedBox(height: screenHeight * 0.01),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                deviceState.deviceName.isNotEmpty
+                                    ? deviceState.deviceName
+                                    : 'No device connected',
+                                style: TextStyle(
+                                  fontSize: screenWidth * 0.045,
+                                  color: Colors.grey[400],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                              Image.asset(
+                                deviceState.isConnected
+                                    ? 'assets/images/connected.png'
+                                    : 'assets/images/disconnected.png',
+                                width: screenWidth * 0.06,
+                                height: screenWidth * 0.06,
+                              ),
+                              SizedBox(width: screenWidth * 0.02),
+                            ],
                           ),
                         ],
-                      ),
-                      SizedBox(height: screenHeight * 0.01),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'No device connected',
-                            style: TextStyle(
-                              fontSize: screenWidth * 0.045,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: screenWidth * 0.02),
-                          Image.asset(
-                            'assets/images/disconnected.png',
-                            width: screenWidth * 0.06,
-                            height: screenWidth * 0.06,
-                          ),
-                          SizedBox(width: screenWidth * 0.02),
-                        ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
 
-              // SPACE BETWEEN HEADER AND LOGO
               const Spacer(flex: 2),
 
               // LOGO
@@ -101,34 +107,49 @@ class ParticipantHomeScreen extends StatelessWidget {
                 },
               ),
 
-              // SPACE BETWEEN LOGO AND BUTTONS
               const Spacer(flex: 2),
 
               // BUTTONS
-              Column(
-                children: [
-                  customButton(
-                    context: context,
-                    text: 'Join Experiment',
-                    onPressed: () {},
-                  ),
-                  SizedBox(height: screenHeight * 0.02),
-                  customButton(
-                    context: context,
-                    text: 'Pair Device',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PairDeviceScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+              Consumer<DeviceState>(
+                builder: (context, deviceState, _) {
+                  return Column(
+                    children: [
+                      customButton(
+                        context: context,
+                        text: 'Join Experiment',
+                        onPressed: () {},
+                      ),
+                      SizedBox(height: screenHeight * 0.02),
+                      customButton(
+                        context: context,
+                        text:
+                            deviceState.isConnected
+                                ? 'Disconnect Device'
+                                : 'Pair Device',
+                        textColor: deviceState.isConnected ? Colors.red : null,
+                        onPressed: () async {
+                          if (deviceState.isConnected) {
+                            await deviceState.disconnectDevice();
+                          } else {
+                            final device =
+                                await Navigator.push<BluetoothDevice?>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const PairDeviceScreen(),
+                                  ),
+                                );
+                            if (device != null) {
+                              deviceState.setDevice(device);
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
 
-              // SPACE BELOW BUTTONS
               const Spacer(flex: 2),
             ],
           ),
