@@ -29,7 +29,7 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
     startScan();
   }
 
-  void startScan() async {
+  void startScan() {
     setState(() {
       scanResults.clear();
       isScanning = true;
@@ -66,6 +66,7 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
           child: Column(
             children: [
               const Spacer(flex: 1),
+              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -85,163 +86,155 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
                 ],
               ),
               const Spacer(flex: 2),
-              SizedBox(
-                height: screenHeight * 0.4,
-                child: Center(
-                  child: Container(
-                    width: screenWidth * 0.9,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth * 0.03,
-                      vertical: screenHeight * 0.02,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC3C3C3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child:
-                        isScanning && scanResults.isEmpty
-                            ? const Center(child: CircularProgressIndicator())
-                            : ListView.separated(
-                              itemCount: scanResults.length,
-                              separatorBuilder:
-                                  (_, __) =>
-                                      SizedBox(height: screenHeight * 0.02),
-                              itemBuilder: (context, index) {
-                                final result = scanResults[index];
-                                final device = result.device;
-                                final isThisConnecting =
-                                    isConnecting &&
-                                    connectingDeviceId == device.id.id;
+              // Centered box for list
+              Center(
+                child: Container(
+                  width: screenWidth * 0.9,
+                  height: screenHeight * 0.45,
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC3C3C3),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child:
+                      isScanning && scanResults.isEmpty
+                          ? const Center(child: CircularProgressIndicator())
+                          : ListView.separated(
+                            itemCount: scanResults.length,
+                            separatorBuilder:
+                                (_, __) =>
+                                    SizedBox(height: screenHeight * 0.02),
+                            itemBuilder: (context, index) {
+                              final result = scanResults[index];
+                              final device = result.device;
+                              final isThisConnecting =
+                                  isConnecting &&
+                                  connectingDeviceId == device.id.id;
 
-                                return SizedBox(
-                                  width: double.infinity,
-                                  height: screenHeight * 0.07,
-                                  child: ElevatedButton(
-                                    onPressed:
-                                        isThisConnecting
-                                            ? null
-                                            : () async {
-                                              setState(() {
-                                                isConnecting = true;
-                                                connectingDeviceId =
-                                                    device.id.id;
-                                              });
+                              return SizedBox(
+                                width: double.infinity,
+                                height: screenHeight * 0.07,
+                                child: ElevatedButton(
+                                  onPressed:
+                                      isThisConnecting
+                                          ? null
+                                          : () async {
+                                            setState(() {
+                                              isConnecting = true;
+                                              connectingDeviceId = device.id.id;
+                                            });
 
-                                              try {
-                                                await _bluetoothService
-                                                    .connectDevice(device);
-                                                if (!mounted) return;
+                                            try {
+                                              await _bluetoothService
+                                                  .connectDevice(device);
+                                              if (!mounted) return;
 
-                                                // Close dialog first, then pop with result safely
-                                                await showDialog(
-                                                  context: context,
-                                                  barrierDismissible: false,
-                                                  builder:
-                                                      (_) => AlertDialog(
-                                                        title: const Text(
-                                                          'Device Connected',
-                                                        ),
-                                                        content: Text(
-                                                          device.name.isNotEmpty
-                                                              ? device.name
-                                                              : 'Unknown device',
-                                                        ),
-                                                        actions: [
-                                                          TextButton(
-                                                            onPressed: () {
-                                                              Navigator.of(
-                                                                context,
-                                                              ).pop(); // close dialog
-                                                            },
-                                                            child: const Text(
-                                                              'OK',
-                                                            ),
-                                                          ),
-                                                        ],
+                                              // Show dialog
+                                              await showDialog(
+                                                context: context,
+                                                barrierDismissible: false,
+                                                builder:
+                                                    (_) => AlertDialog(
+                                                      title: const Text(
+                                                        'Device Connected',
                                                       ),
-                                                );
-
-                                                // Use microtask to ensure navigator transition finished
-                                                Future.microtask(() {
-                                                  if (mounted) {
-                                                    Navigator.pop(
-                                                      context,
-                                                      device,
-                                                    ); // return device
-                                                  }
-                                                });
-                                              } catch (e) {
-                                                if (!mounted) return;
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Failed to connect: $e',
+                                                      content: Text(
+                                                        device.name.isNotEmpty
+                                                            ? device.name
+                                                            : 'Unknown device',
+                                                      ),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed:
+                                                              () =>
+                                                                  Navigator.of(
+                                                                    context,
+                                                                  ).pop(),
+                                                          child: const Text(
+                                                            'OK',
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
+                                              );
+
+                                              // Return device after dialog
+                                              if (mounted) {
+                                                Navigator.pop(context, device);
+                                              }
+                                            } catch (e) {
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Failed to connect: $e',
                                                   ),
-                                                );
-                                              } finally {
+                                                ),
+                                              );
+                                            } finally {
+                                              if (mounted) {
                                                 setState(() {
                                                   isConnecting = false;
                                                   connectingDeviceId = '';
                                                 });
                                               }
-                                            },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          isThisConnecting
-                                              ? Colors.grey
-                                              : Colors.green,
-                                      shape: RoundedRectangleBorder(
-                                        side: const BorderSide(
-                                          color: Colors.black,
-                                          width: 2,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child:
+                                            }
+                                          },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
                                         isThisConnecting
-                                            ? const Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                        color: Colors.black,
-                                                      ),
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Connecting...',
-                                                  style: TextStyle(
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.black,
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                            : Text(
-                                              device.name.isNotEmpty
-                                                  ? device.name
-                                                  : 'Unknown device',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black,
-                                              ),
-                                            ),
+                                            ? Colors.grey
+                                            : Colors.green,
+                                    shape: RoundedRectangleBorder(
+                                      side: const BorderSide(
+                                        color: Colors.black,
+                                        width: 2,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
-                                );
-                              },
-                            ),
-                  ),
+                                  child:
+                                      isThisConnecting
+                                          ? const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.black,
+                                                    ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Connecting...',
+                                                style: TextStyle(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                          : Text(
+                                            device.name.isNotEmpty
+                                                ? device.name
+                                                : 'Unknown device',
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                ),
+                              );
+                            },
+                          ),
                 ),
               ),
               const Spacer(flex: 2),

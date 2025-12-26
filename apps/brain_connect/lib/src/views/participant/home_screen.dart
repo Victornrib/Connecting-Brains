@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:brain_connect/src/views/participant/pair_device.dart';
 import 'package:brain_connect/src/widgets/buttons.dart';
-import 'package:brain_connect/src/models/device_state.dart';
+import 'package:brain_connect/src/providers/device_state.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class ParticipantHomeScreen extends StatelessWidget {
@@ -50,7 +50,7 @@ class ParticipantHomeScreen extends StatelessWidget {
                               ),
                               SizedBox(width: screenWidth * 0.02),
                               GestureDetector(
-                                onTap: () => debugPrint('User settings screen'),
+                                onTap: () => print('User settings screen'),
                                 child: Image.asset(
                                   'assets/images/user.png',
                                   width: screenWidth * 0.1,
@@ -64,9 +64,7 @@ class ParticipantHomeScreen extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                deviceState.deviceName.isNotEmpty
-                                    ? deviceState.deviceName
-                                    : 'No device connected',
+                                deviceState.deviceName,
                                 style: TextStyle(
                                   fontSize: screenWidth * 0.045,
                                   color: Colors.grey[400],
@@ -129,16 +127,16 @@ class ParticipantHomeScreen extends StatelessWidget {
                         textColor: deviceState.isConnected ? Colors.red : null,
                         onPressed: () async {
                           if (deviceState.isConnected) {
-                            await deviceState.disconnectDevice();
+                            deviceState.disconnectDevice();
                           } else {
-                            final device =
-                                await Navigator.push<BluetoothDevice?>(
+                            final BluetoothDevice? device =
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder:
-                                        (context) => const PairDeviceScreen(),
+                                    builder: (_) => const PairDeviceScreen(),
                                   ),
                                 );
+
                             if (device != null) {
                               deviceState.setDevice(device);
                             }

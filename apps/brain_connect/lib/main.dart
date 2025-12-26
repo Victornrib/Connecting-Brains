@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:brain_connect/src/views/participant/home_screen.dart';
-import 'package:brain_connect/src/models/device_state.dart';
+import 'package:brain_connect/src/providers/device_state.dart';
 
 void main() {
   runApp(

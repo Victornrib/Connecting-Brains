@@ -1,5 +1,6 @@
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../models/device.dart';
 
 class AppBluetoothService {
   Future<bool> requestPermissions() async {
